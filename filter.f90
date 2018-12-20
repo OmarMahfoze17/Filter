@@ -5,14 +5,15 @@ program filter
 USE variables
 implicit none
 integer,parameter :: nx=128,ny=129,nz=256
-integer :: npaire,i,j,k
+integer :: npaire,i,j,k,count
 real(8), dimension(nx,ny,nz) :: u_filter,ux,rx
 real(8), dimension(ny,nz):: sx
 real(8) :: dx,dz
 real(8), dimension(nx):: ffx_filter,fsx_filter,fwx_filter,fcx_filter,fbx_filter
 real(8), dimension(nz):: ffz_filter,fsz_filter,fwz_filter,fcz_filter,fbz_filter
+real :: t1,t2
 pi=acos(-1.)
-nclx=2
+nclx=0
 nclz=0
 print *, 'nclx =', nclx ,nclz
 dx=12./(nx)
@@ -20,14 +21,18 @@ dz=12./nz
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
 !!! This part to be included in scheme.f90 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+alfa1_filter= 0.
+alfa2_filter= 0.
+alfan_filter= 0.
+alfam_filter= 0.
+alfai_filter= 0.3 
 
 !!! work in X-direction ==========================================
-alfa1x_filter= 0.
-alfa2x_filter= 0.
-alfanx_filter= 0.
-alfamx_filter= 0.
-alfaix_filter= 0.4   !!!???????????????????????????????????????? DO Global variables
+alfa1x_filter= alfa1_filter
+alfa2x_filter= alfa2_filter
+alfanx_filter= alfan_filter
+alfamx_filter= alfam_filter
+alfaix_filter= alfai_filter   !!!???????????????????????????????????????? DO Global variables
 
 
 
@@ -121,15 +126,15 @@ call prepare (fbx_filter,fcx_filter,ffx_filter ,fsx_filter ,fwx_filter ,nx)
 
 
 !!! work in Z-direction ==========================================
-alfa1z_filter= 0.
-alfa2z_filter= 0.
-alfanz_filter= 0.
-alfamz_filter= 0.
-alfaiz_filter= 0.4
+alfa1z_filter= alfa1_filter
+alfa2z_filter= alfa2_filter
+alfanz_filter= alfan_filter
+alfamz_filter= alfam_filter
+alfaiz_filter= alfai_filter
 
 
 if (nclz.eq.0) then
-   ffz_filter(1)   =alfaix_filter
+   ffz_filter(1)   =alfaiz_filter
    ffz_filter(2)   =alfaiz_filter
    ffz_filter(nz-2)=alfaiz_filter
    ffz_filter(nz-1)=alfaiz_filter
@@ -223,15 +228,18 @@ call prepare (fbz_filter,fcz_filter,ffz_filter ,fsz_filter ,fwz_filter ,nz)
 
 
 
-
+open(1, file='ux001',FORM='UNFORMATTED', action="read",access='direct', RECL=8)
 
 do k=1,nz
 do j=1,ny
 do i=1,nx
 !call srand(1)
 !   ux(i,j,k)=sin(2*pi*(i-1)*dx/12)+rand(0)
-   ux(i,j,k)=sin(2*pi*(k-1)*dz/12)+rand(0)
-!   print *, rand(0)
+!   ux(i,j,k)=sin(2*pi*(k-1)*dz/12)+sin(2*pi*(i-1)*dx/12)+rand(0)*.2
+   COUNT = COUNT + 1
+   READ(1,REC=COUNT) ux(I,J,K)
+   
+
 enddo
 enddo
 enddo
@@ -246,8 +254,11 @@ ENDDO
 ENDDO
 close(10) 
 
-
+call CPU_TIME(t1)
 call filter_x(u_filter,ux,ffx_filter,fsx_filter,fwx_filter,nx,ny,nz,1)
+call CPU_TIME(t2)
+
+print *, 'filter x time = ', t2-t1
 !call filter_x(u_filter,ux,rx,sx,ffx_filter,fsx_filter,fwx_filter,nx,ny,nz,1)
 open(20, file='ux_filter_X.dat',FORM='UNFORMATTED', action="write",access='stream')
 DO K=1,nz
@@ -258,8 +269,12 @@ ENDDO
 ENDDO
 ENDDO
 close(20)
-
+call CPU_TIME(t1)
 call filter_z(u_filter,ux,ffz_filter,fsz_filter,fwz_filter,nx,ny,nz,1)
+
+call CPU_TIME(t2)
+
+print *, 'filter z time = ', t2-t1
 !call filter_x(u_filter,ux,rx,sx,ffx_filter,fsx_filter,fwx_filter,nx,ny,nz,1)
 open(30, file='ux_filter_Z.dat',FORM='UNFORMATTED', action="write",access='stream')
 DO K=1,nz
@@ -403,8 +418,9 @@ real(8), dimension(nx,ny):: sz
 real(8), dimension(nz) :: ffz_filter,fsz_filter,fwz_filter
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 if (nclz==0) then
-   do i=1,nx
+   
    do j=1,ny
+   do i=1,nx
       tz(i,j,1)=cfiz_filter*uz(i,j,1)&
                +afiz_filter*(uz(i,j,2)+uz(i,j,nz))&
                +bfiz_filter*(uz(i,j,3)+uz(i,j,nz-1))
@@ -414,12 +430,6 @@ if (nclz==0) then
                +afiz_filter*(uz(i,j,3)+uz(i,j,1))&
                +bfiz_filter*(uz(i,j,4)+uz(i,j,nz))
       rz(i,j,2)=0.
-      do k=3,nz-2
-         tz(i,j,k)=cfiz_filter*uz(i,j,k)&
-                  +afiz_filter*(uz(i,j,k+1)+uz(i,j,k-1))&
-                  +bfiz_filter*(uz(i,j,k+2)+uz(i,j,k-2))
-         rz(i,j,k)=0.
-      enddo
       
       tz(i,j,nz-1)=cfiz_filter*uz(i,j,nz-1)&
                   +afiz_filter*(uz(i,j,nz)+uz(i,j,nz-2))&
@@ -429,53 +439,104 @@ if (nclz==0) then
                 +afiz_filter*(uz(i,j,1)+uz(i,j,nz-1))&
                 +bfiz_filter*(uz(i,j,2)+uz(i,j,nz-2))
       rz(i,j,nz)=alfaiz_filter
+   enddo
+   enddo
+   
+      do k=3,nz-2
+      do j=1,ny
+      do i=1,nx
+         tz(i,j,k)=cfiz_filter*uz(i,j,k)&
+                  +afiz_filter*(uz(i,j,k+1)+uz(i,j,k-1))&
+                  +bfiz_filter*(uz(i,j,k+2)+uz(i,j,k-2))
+         rz(i,j,k)=0.
+      enddo
+      enddo
+      enddo
+
+      
       do k=2, nz
+      do j=1,ny
+      do i=1,nx      
          tz(i,j,k)=tz(i,j,k)-tz(i,j,k-1)*fsz_filter(k)
          rz(i,j,k)=rz(i,j,k)-rz(i,j,k-1)*fsz_filter(k)
       enddo
-      tz(i,j,nz)=tz(i,j,nz)*fwz_filter(nz)
-      rz(i,j,nz)=rz(i,j,nz)*fwz_filter(nz)   
-
+      enddo
+      enddo
+      
+!      do j=1,ny
+!      do i=1,nx       
+      tz(:,:,nz)=tz(:,:,nz)*fwz_filter(nz)
+      rz(:,:,nz)=rz(:,:,nz)*fwz_filter(nz)   
+!      enddo
+!      enddo
+      
       do k=nz-1,1,-1
+      do j=1,ny
+      do i=1,nx      
          tz(i,j,k)=(tz(i,j,k)-ffz_filter(k)*tz(i,j,k+1))*fwz_filter(k)
          rz(i,j,k)=(rz(i,j,k)-ffz_filter(k)*rz(i,j,k+1))*fwz_filter(k)
       enddo
+      enddo
+      enddo
       
-      sz(i,j)=(tz(i,j,1)-alfaiz_filter*tz(i,j,nz))&
-           /(1.+rz(i,j,1)-alfaiz_filter*rz(i,j,nz))
+      
+!      do j=1,ny
+!      do i=1,nx      
+      sz(:,:)=(tz(:,:,1)-alfaiz_filter*tz(:,:,nz))&
+           /(1.+rz(:,:,1)-alfaiz_filter*rz(:,:,nz))
+!      enddo
+!      enddo
+      
       do k=1,nz
+      do j=1,ny
+      do i=1,nx
          tz(i,j,k)=tz(i,j,k)-sz(i,j)*rz(i,j,k)
       enddo
-   
-   enddo
-   enddo
+      enddo
+      enddo
 endif
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
 
 if (nclz==2) then
-   do i=1,nx
+   
    do j=1,ny
+   do i=1,nx
       tz(i,j,1)=af1z_filter*uz(i,j,1)+bf1z_filter*uz(i,j,2)&
                +cf1z_filter*uz(i,j,3)+df1z_filter*uz(i,j,4)+ef1z_filter*uz(i,j,5)
       tz(i,j,2)=af2z_filter*uz(i,j,1)+bf2z_filter*uz(i,j,2)&
                +cf2z_filter*uz(i,j,3)+df2z_filter*uz(i,j,4)+ef2z_filter*uz(i,j,5)
-      do k=3,nz-2
-         tz(i,j,k)=cfiz_filter*uz(i,j,k)&
-                  +afiz_filter*(uz(i,j,k+1)+uz(i,j,k-1))&
-                  +bfiz_filter*(uz(i,j,k+2)+uz(i,j,k-2))
-      enddo
       tz(i,j,nz)=afnz_filter*uz(i,j,nz)+bfnz_filter*uz(i,j,nz-1)&
                +cfnz_filter*uz(i,j,nz-2)+dfnz_filter*uz(i,j,nz-3)+efnz_filter*uz(i,j,nz-4)
-      tz(i-1,j,nz-1)=afmz_filter*uz(i,j,nz)+bfmz_filter*uz(i,j,nz-1)&
+      tz(i,j,nz-1)=afmz_filter*uz(i,j,nz)+bfmz_filter*uz(i,j,nz-1)&
                +cfmz_filter*uz(i,j,nz-2)+dfmz_filter*uz(i,j,nz-3)+efmz_filter*uz(i,j,nz-4)
-      do k=2,nz
+   enddo
+   enddo
+   
+   do k=3,nz-2
+   do j=1,ny
+   do i=1,nx      
+       tz(i,j,k)=cfiz_filter*uz(i,j,k)&
+                +afiz_filter*(uz(i,j,k+1)+uz(i,j,k-1))&
+                +bfiz_filter*(uz(i,j,k+2)+uz(i,j,k-2))
+   enddo
+   enddo
+   enddo
+   
+   do k=2,nz
+   do j=1,ny
+   do i=1,nx    
          tz(i,j,k)=tz(i,j,k)-tz(i,j,k-1)*fsz_filter(k)
-      enddo
-      tz(i,j,nz)=tz(i,j,nz)*fwz_filter(nz)
+   enddo
+   enddo
+   enddo
+      
+      tz(:,:,nz)=tz(:,:,nz)*fwz_filter(nz)
 !      print *, tz(i,j,1),ffz_filter(k),fwz_filter(k)
-      do k=nz-1,1,-1
-         tz(i,j,k)=(tz(i,j,k)-ffz_filter(k)*tz(i,j,k+1))*fwz_filter(k)
-      enddo
+   do k=nz-1,1,-1
+   do j=1,ny
+   do i=1,nx      
+      tz(i,j,k)=(tz(i,j,k)-ffz_filter(k)*tz(i,j,k+1))*fwz_filter(k)
+   enddo
    enddo
    enddo
 endif
@@ -495,6 +556,7 @@ real(8) :: af1x_filter,bf1x_filter,cf1x_filter,afnx_filter,bfnx_filter,cfnx_filt
 real(8) :: df1x_filter,ef1x_filter,dfnx_filter,efnx_filter,dfmx_filter,efmx_filter,bfmx_filter,bf2x_filter,cf2x_filter
 real(8) :: af2x_filter,afmx_filter,cfmx_filter,df2x_filter,ef2x_filter
 real(8) :: alfa1x_filter,alfa2x_filter,alfanx_filter,alfamx_filter,alfaix_filter
+real(8) :: alfa1_filter,alfa2_filter,alfan_filter,alfam_filter,alfai_filter
 integer :: nclx
 
 real(8) :: af1z_filter,bf1z_filter,cf1z_filter,afnz_filter,bfnz_filter,cfnz_filter,afiz_filter,bfiz_filter,dfiz_filter,cfiz_filter
