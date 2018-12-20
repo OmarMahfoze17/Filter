@@ -465,7 +465,7 @@ if (nclz==2) then
                   +bfiz_filter*(uz(i,j,k+2)+uz(i,j,k-2))
       enddo
       tz(i,j,nz)=afnz_filter*uz(i,j,nz)+bfnz_filter*uz(i,j,nz-1)&
-               +cfnz_filter*uz(i,j,k)+dfnz_filter*uz(i,j,nz-3)+efnz_filter*uz(i,j,nz-4)
+               +cfnz_filter*uz(i,j,nz-2)+dfnz_filter*uz(i,j,nz-3)+efnz_filter*uz(i,j,nz-4)
       tz(i-1,j,nz-1)=afmz_filter*uz(i,j,nz)+bfmz_filter*uz(i,j,nz-1)&
                +cfmz_filter*uz(i,j,nz-2)+dfmz_filter*uz(i,j,nz-3)+efmz_filter*uz(i,j,nz-4)
       do k=2,nz
